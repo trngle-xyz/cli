@@ -20,7 +20,6 @@ import (
 	"github.com/trngle-xyz/cli/internal/core"
 	"github.com/trngle-xyz/cli/internal/wallet"
 	"github.com/trngle-xyz/cli/internal/wallet/loop"
-	"github.com/trngle-xyz/cli/internal/wallet/participant"
 )
 
 type tradeWallet interface {
@@ -29,9 +28,8 @@ type tradeWallet interface {
 }
 
 var (
-	newQuoteClientFn       = core.NewQuoteClient
-	newTradeWalletFn       = func() tradeWallet { return loop.NewAdapter() }
-	newParticipantWalletFn = func() tradeWallet { return participant.NewAdapter() }
+	newQuoteClientFn = core.NewQuoteClient
+	newTradeWalletFn = func() tradeWallet { return loop.NewAdapter() }
 )
 
 type walletInitMsg struct {
@@ -200,55 +198,10 @@ func fetchBalancesCmd(cfg config.AppConfig, preferredPartyID string) tea.Cmd {
 
 		balances, err := adapter.GetBalances()
 		if err != nil {
-			if !useLoopWalletProvider(cfg) && isSecuritySensitiveErr(err) {
-				if participantAdapter, ok := adapter.(*participant.Adapter); ok {
-					participantPartyID, idErr := participantAdapter.FetchParticipantPartyID()
-					if idErr == nil && strings.TrimSpace(participantPartyID) != "" {
-						if takerNamespaced := withParticipantNamespace(authPartyID, participantPartyID); strings.TrimSpace(takerNamespaced) != "" && !strings.EqualFold(strings.TrimSpace(takerNamespaced), strings.TrimSpace(authPartyID)) {
-							if authErr := participantAdapter.Authenticate(takerNamespaced, apiURL); authErr == nil {
-								if retryBalances, retryErr := participantAdapter.GetBalances(); retryErr == nil {
-									return balancesResultMsg{balances: retryBalances}
-								}
-							}
-						}
-						if !strings.EqualFold(strings.TrimSpace(participantPartyID), strings.TrimSpace(authPartyID)) {
-							if authErr := participantAdapter.Authenticate(participantPartyID, apiURL); authErr == nil {
-								if retryBalances, retryErr := participantAdapter.GetBalances(); retryErr == nil {
-									return balancesResultMsg{balances: retryBalances}
-								}
-							}
-						}
-					}
-				}
-			}
 			return balancesResultMsg{err: err}
 		}
 		return balancesResultMsg{balances: balances}
 	}
-}
-
-func isSecuritySensitiveErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "security-sensitive") || strings.Contains(msg, "\"code\":\"na\"") || strings.Contains(msg, "code na")
-}
-
-func withParticipantNamespace(partyID, participantPartyID string) string {
-	p := strings.TrimSpace(partyID)
-	if p == "" || strings.Contains(p, "::") {
-		return p
-	}
-	host := strings.TrimSpace(participantPartyID)
-	if host == "" {
-		return p
-	}
-	parts := strings.SplitN(host, "::", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[1]) == "" {
-		return p
-	}
-	return p + "::" + strings.TrimSpace(parts[1])
 }
 
 // checkAPIHealthCmd checks if the local API server is reachable.
@@ -347,21 +300,6 @@ func resolveQuotePartyID(cfg config.AppConfig, fallback string) string {
 }
 
 func resolveWalletAPIURL(cfg config.AppConfig) string {
-	if !useLoopWalletProvider(cfg) {
-		if v := strings.TrimSpace(os.Getenv("TRNGLE_PARTICIPANT_LEDGER_URL")); v != "" {
-			return v
-		}
-		if v := strings.TrimSpace(os.Getenv("OPERATOR_CANTON_LEDGER_URL")); v != "" {
-			return v
-		}
-		if v := strings.TrimSpace(os.Getenv("CANTON_LEDGER_URL")); v != "" {
-			return v
-		}
-		// Defer participant URL discovery to the participant adapter:
-		// it checks process env, repo .env files, then localhost default.
-		return ""
-	}
-
 	if v := strings.TrimSpace(os.Getenv("TRNGLE_LOOP_API_URL")); v != "" {
 		return v
 	}
@@ -375,32 +313,12 @@ func resolveWalletAPIURL(cfg config.AppConfig) string {
 	return loop.NetworkAPIURLs["mainnet"]
 }
 
-func walletAdapterForConfig(cfg config.AppConfig) tradeWallet {
-	if useLoopWalletProvider(cfg) {
-		return newTradeWalletFn()
-	}
-	return newParticipantWalletFn()
+func walletAdapterForConfig(_ config.AppConfig) tradeWallet {
+	return newTradeWalletFn()
 }
 
-func useLoopWalletProvider(cfg config.AppConfig) bool {
-	provider := resolvedWalletProvider(cfg)
-	if provider == "" {
-		return true
-	}
-	if provider == "participant" || provider == "canton" || provider == "local" {
-		return false
-	}
-	if provider == "loop" {
-		return true
-	}
-	return false
-}
-
-func resolvedWalletProvider(cfg config.AppConfig) string {
-	if v := strings.ToLower(strings.TrimSpace(os.Getenv("TRNGLE_WALLET_PROVIDER_OVERRIDE"))); v != "" {
-		return v
-	}
-	return strings.ToLower(strings.TrimSpace(cfg.WalletProvider))
+func useLoopWalletProvider(_ config.AppConfig) bool {
+	return true
 }
 
 // fetchAcceptContextCmd calls the operator /accept endpoint to create the

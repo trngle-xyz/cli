@@ -1,6 +1,6 @@
 # Binaries
-trngle
-trngle.exe
+/trngle
+/trngle.exe
 dist/
 
 # Planning files (local working memory, not shipped)
