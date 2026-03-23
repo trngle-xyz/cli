@@ -1,11 +1,11 @@
 #!/bin/sh
 # Install trngle CLI — https://trngle.xyz
-# Usage: curl -fsSL https://trngle.xyz/install | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/trngle-xyz/cli/main/install.sh | sh
 set -e
 
 REPO="trngle-xyz/cli"
 BINARY="trngle"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="${HOME}/.local/bin"
 
 # Detect OS
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -40,17 +40,30 @@ TMPDIR=$(mktemp -d)
 curl -fsSL -o "${TMPDIR}/${BINARY}" "$URL"
 chmod +x "${TMPDIR}/${BINARY}"
 
-# Install
-if [ -w "$INSTALL_DIR" ]; then
-  mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-else
-  echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-  sudo mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-fi
+# Install to ~/.local/bin (no sudo needed)
+mkdir -p "$INSTALL_DIR"
+mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 rm -rf "$TMPDIR"
 
+# Check if ~/.local/bin is in PATH
+case ":$PATH:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    echo ""
+    echo "NOTE: ${INSTALL_DIR} is not in your PATH."
+    echo "Add it by running:"
+    echo ""
+    SHELL_NAME="$(basename "${SHELL:-/bin/sh}")"
+    case "$SHELL_NAME" in
+      zsh)  echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc && source ~/.zshrc" ;;
+      fish) echo "  fish_add_path ${INSTALL_DIR}" ;;
+      *)    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc && source ~/.bashrc" ;;
+    esac
+    ;;
+esac
+
 echo ""
-echo "✓ trngle ${LATEST} installed to ${INSTALL_DIR}/${BINARY}"
+echo "trngle ${LATEST} installed to ${INSTALL_DIR}/${BINARY}"
 echo ""
 echo "Get started:"
 echo "  trngle"

@@ -4,17 +4,13 @@
 set -e
 
 BINARY="trngle"
-LOCATIONS="/usr/local/bin/${BINARY} ${HOME}/.local/bin/${BINARY}"
+LOCATIONS="${HOME}/.local/bin/${BINARY} /usr/local/bin/${BINARY}"
 CONFIG_DIR="${HOME}/.trngle"
 
 found=0
 for path in $LOCATIONS; do
   if [ -f "$path" ]; then
-    if [ -w "$(dirname "$path")" ]; then
-      rm -f "$path"
-    else
-      sudo rm -f "$path"
-    fi
+    rm -f "$path"
     echo "Removed $path"
     found=1
   fi
