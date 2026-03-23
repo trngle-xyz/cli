@@ -1,6 +1,6 @@
 #!/bin/sh
 # Install trngle CLI — https://trngle.xyz
-# Usage: curl -fsSL https://raw.githubusercontent.com/trngle-xyz/cli/main/install.sh | sh
+# Usage: curl -fsSL https://cli.trngle.xyz/install.sh | sh
 set -e
 
 REPO="trngle-xyz/cli"
@@ -45,20 +45,28 @@ mkdir -p "$INSTALL_DIR"
 mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 rm -rf "$TMPDIR"
 
-# Check if ~/.local/bin is in PATH
+# Add to PATH if not already there
 case ":$PATH:" in
   *":${INSTALL_DIR}:"*) ;;
   *)
-    echo ""
-    echo "NOTE: ${INSTALL_DIR} is not in your PATH."
-    echo "Add it by running:"
-    echo ""
     SHELL_NAME="$(basename "${SHELL:-/bin/sh}")"
+    EXPORT_LINE='export PATH="$HOME/.local/bin:$PATH"'
     case "$SHELL_NAME" in
-      zsh)  echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc && source ~/.zshrc" ;;
-      fish) echo "  fish_add_path ${INSTALL_DIR}" ;;
-      *)    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc && source ~/.bashrc" ;;
+      zsh)  RC="$HOME/.zshrc" ;;
+      fish)
+        fish -c "fish_add_path ${INSTALL_DIR}" 2>/dev/null || true
+        RC=""
+        ;;
+      *)    RC="$HOME/.bashrc" ;;
     esac
+    if [ -n "$RC" ]; then
+      if ! grep -qF '.local/bin' "$RC" 2>/dev/null; then
+        echo "" >> "$RC"
+        echo "$EXPORT_LINE" >> "$RC"
+        echo "Added ${INSTALL_DIR} to PATH in ${RC}"
+      fi
+    fi
+    echo "Open a new terminal or run:  source ${RC}"
     ;;
 esac
 

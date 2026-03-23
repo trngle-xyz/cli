@@ -17,13 +17,13 @@ Early software. Expect rough edges, report bugs.
 **Mac / Linux:**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/trngle-xyz/cli/main/install.sh | sh
+curl -fsSL https://cli.trngle.xyz/install.sh | sh
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/trngle-xyz/cli/main/install.ps1 | iex
+irm https://cli.trngle.xyz/install.ps1 | iex
 ```
 
 No dependencies required. The install script downloads a single binary and puts it in your PATH.
@@ -33,13 +33,13 @@ No dependencies required. The install script downloads a single binary and puts 
 **Mac / Linux:**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/trngle-xyz/cli/main/uninstall.sh | sh
+curl -fsSL https://cli.trngle.xyz/uninstall.sh | sh
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/trngle-xyz/cli/main/uninstall.ps1 | iex
+irm https://cli.trngle.xyz/uninstall.ps1 | iex
 ```
 
 This removes the binary and optionally your config/history at `~/.trngle/`.

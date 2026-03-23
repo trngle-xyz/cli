@@ -1,5 +1,5 @@
 # Uninstall trngle CLI for Windows
-# Usage: irm https://raw.githubusercontent.com/trngle-xyz/cli/main/uninstall.ps1 | iex
+# Usage: irm https://cli.trngle.xyz/uninstall.ps1 | iex
 $ErrorActionPreference = "Stop"
 
 $Binary = "trngle"

@@ -1,5 +1,5 @@
 # Install trngle CLI for Windows — https://trngle.xyz
-# Usage: irm https://trngle.xyz/install.ps1 | iex
+# Usage: irm https://cli.trngle.xyz/install.ps1 | iex
 $ErrorActionPreference = "Stop"
 
 $Repo = "trngle-xyz/cli"

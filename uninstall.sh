@@ -1,6 +1,6 @@
 #!/bin/sh
 # Uninstall trngle CLI
-# Usage: curl -fsSL https://trngle.xyz/uninstall | sh
+# Usage: curl -fsSL https://cli.trngle.xyz/uninstall.sh | sh
 set -e
 
 BINARY="trngle"
