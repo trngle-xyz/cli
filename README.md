@@ -1,14 +1,16 @@
-# trngle
+# trngle (testnet)
 
-A terminal app for swapping tokens on [Canton Network](https://www.canton.network/).
+A terminal app for trading tokens on [Canton Network](https://www.canton.network/). Currently integrated with **Loop wallets** — more wallet support coming.
 
-Trade CC (Amulet), CBTC, and USDXLR directly from your terminal — no browser, no extensions, no middleman. Connect your Canton wallet, get a quote, confirm, done.
+trngle runs entirely on your machine. Your keys stay local, the code runs local, and the only external call is to the operator API for quotes and settlement. Nothing is custodial — you sign every trade yourself from your own wallet.
+
+Your keys. Your terminal. Your trades.
 
 ## Status
 
-**Testnet** — currently running on Canton Network testnet. Mainnet support is planned.
+**Testnet only** — this build runs on Canton Network testnet with test tokens. Mainnet support is planned.
 
-This is early software. You're trading on testnet with test tokens. Expect rough edges, report bugs.
+Early software. Expect rough edges, report bugs.
 
 ## Install
 
@@ -28,8 +30,16 @@ No dependencies required. The install script downloads a single binary and puts 
 
 ## Uninstall
 
+**Mac / Linux:**
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/trngle-xyz/cli/main/uninstall.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/trngle-xyz/cli/main/uninstall.ps1 | iex
 ```
 
 This removes the binary and optionally your config/history at `~/.trngle/`.
@@ -43,7 +53,7 @@ trngle
 On first run, the setup wizard walks you through:
 
 1. **Network** — select testnet
-2. **Wallet** — connect your Canton Loop wallet (ed25519 key + party ID)
+2. **Wallet** — connect your Loop wallet (ed25519 key + party ID)
 3. **API** — optional local REST API for programmatic access
 
 Once connected, you can trade:
@@ -76,14 +86,14 @@ The app fetches a live quote from the operator, shows you the rate, and waits fo
 
 ## How It Works
 
-trngle connects to the Canton Network through an operator API. When you request a quote:
+trngle is a self-contained binary that runs on your computer. When you request a trade:
 
-1. The operator finds a counterparty and returns a price
-2. You review the quote in your terminal
-3. On confirmation, trngle signs and submits the trade on-chain via your Loop wallet
+1. trngle calls the operator API for a quote
+2. You review the price in your terminal
+3. On confirmation, trngle signs the trade locally with your private key and submits it on-chain via your Loop wallet
 4. The operator settles the trade — both sides receive their tokens
 
-All signing happens locally. Your private key never leaves your machine.
+The operator provides liquidity and settlement. trngle provides the interface. All cryptographic signing happens on your machine — your private key never leaves your computer and is never sent to the operator or anyone else.
 
 ## Configuration
 
