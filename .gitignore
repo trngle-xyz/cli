@@ -1,0 +1,23 @@
+# Binaries
+trngle
+trngle.exe
+dist/
+
+# Planning files (local working memory, not shipped)
+task_plan.md
+findings.md
+progress.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test artifacts
+*.test
+*.out
