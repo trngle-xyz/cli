@@ -28,7 +28,7 @@ type tradeWallet interface {
 }
 
 var (
-	newQuoteClientFn = core.NewQuoteClient
+	newQuoteClientFn = core.NewQuoteClient // func(baseURL, apiKey string) QuoteClient
 	newTradeWalletFn = func() tradeWallet { return loop.NewAdapter() }
 )
 
@@ -276,7 +276,7 @@ func shutdownAppCmd(cfg config.AppConfig) tea.Cmd {
 // no on-chain work happens until the user confirms.
 func prefetchQuoteCmd(cfg config.AppConfig, from, to, amount, partyID string) tea.Cmd {
 	return func() tea.Msg {
-		client := newQuoteClientFn(cfg.TrngleAPIURL)
+		client := newQuoteClientFn(cfg.TrngleAPIURL, cfg.TrngleAPIKey)
 		quoteParty := resolveQuotePartyID(cfg, partyID)
 		quote, err := client.RequestQuote(context.Background(), from, to, amount, quoteParty)
 		if err != nil {
@@ -326,7 +326,7 @@ func useLoopWalletProvider(_ config.AppConfig) bool {
 // happens here — that is deferred to submitOnChainCmd.
 func fetchAcceptContextCmd(cfg config.AppConfig, quoteID string) tea.Cmd {
 	return func() tea.Msg {
-		client := newQuoteClientFn(cfg.TrngleAPIURL)
+		client := newQuoteClientFn(cfg.TrngleAPIURL, cfg.TrngleAPIKey)
 		acceptCtx, err := client.AcceptQuoteContext(context.Background(), quoteID)
 		if err != nil {
 			return quoteAcceptContextReadyMsg{quoteID: quoteID, err: fmt.Errorf("accept quote: %w", err)}
@@ -428,7 +428,7 @@ func executeQuoteSubmitCmd(cfg config.AppConfig, activeQuote *ActiveQuote) tea.C
 			return quoteSubmitResultMsg{quoteID: activeQuote.ID, submitErr: fmt.Errorf("auth failed: %w", err)}
 		}
 
-		client := newQuoteClientFn(cfg.TrngleAPIURL)
+		client := newQuoteClientFn(cfg.TrngleAPIURL, cfg.TrngleAPIKey)
 
 		// Fetch accept context now (operator creates the trade on-chain).
 		// This is the first on-chain action — triggered by the user pressing Y.
@@ -975,7 +975,7 @@ func submitWithHoldingCmd(cfg config.AppConfig, activeQuote *ActiveQuote, single
 		if err := adapter.Authenticate(takerParty, apiURL); err != nil {
 			return quoteSubmitResultMsg{quoteID: activeQuote.ID, submitErr: fmt.Errorf("auth failed: %w", err)}
 		}
-		client := newQuoteClientFn(cfg.TrngleAPIURL)
+		client := newQuoteClientFn(cfg.TrngleAPIURL, cfg.TrngleAPIKey)
 		return executeAcceptContextSubmit(client, adapter, activeQuote, single, cfg.Network)
 	}
 }

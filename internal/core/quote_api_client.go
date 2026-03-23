@@ -20,15 +20,17 @@ import (
 // Request/response shapes match docs/design/OPERATOR_DESIGN.md.
 type QuoteAPIClient struct {
 	baseURL    string
+	apiKey     string
 	httpClient *http.Client
 }
 
-func NewQuoteAPIClient(baseURL string) *QuoteAPIClient {
+func NewQuoteAPIClient(baseURL, apiKey string) *QuoteAPIClient {
 	if baseURL == "" {
 		baseURL = "https://api.trngle.com"
 	}
 	return &QuoteAPIClient{
 		baseURL: baseURL,
+		apiKey:  apiKey,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
@@ -174,6 +176,9 @@ func (c *QuoteAPIClient) doRequest(ctx context.Context, method, url string, body
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.apiKey != "" {
+		req.Header.Set("X-API-Key", c.apiKey)
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

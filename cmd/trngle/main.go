@@ -82,7 +82,7 @@ func runAPIOnly() error {
 	}
 	defer historyDB.Close()
 
-	quoteClient := core.NewQuoteClient(cfg.TrngleAPIURL)
+	quoteClient := core.NewQuoteClient(cfg.TrngleAPIURL, cfg.TrngleAPIKey)
 	server := api.NewServer(addr, walletAdapter, quoteClient, historyDB)
 	fmt.Printf("Starting local API server at http://%s\n", addr)
 
