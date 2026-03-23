@@ -449,6 +449,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewportReady = true
 			}
 
+			// Connect WebSocket notifications now that config has party ID.
+			m.quote.ConnectNotifications(msg.cfg.TrngleAPIURL, msg.cfg.WalletPartyID)
+
 			return m, tea.Batch(
 				m.spinner.Tick,
 				textinput.Blink,
@@ -532,10 +535,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			// No WebSocket — fall through to tick-based animation.
+			// Stop inline spinner first to avoid dual-animation conflict.
+			if m.inlineSpinner.active {
+				m.StopInlineSpinner()
+			}
 		}
 		output, replacement, shouldReplace, cmd := m.quote.HandleStatusTick()
-		if shouldReplace {
-			m.ReplaceSpinnerLine(replacement)
+		if shouldReplace && len(m.output) > 0 {
+			// Directly update the last line instead of ReplaceSpinnerLine,
+			// which relies on spinnerLineOwned and breaks after the first call.
+			m.output[len(m.output)-1] = replacement
+			m.viewport.SetContent(joinLines(m.output))
+			m.viewport.GotoBottom()
 		}
 		for _, line := range output {
 			m.appendOutput(line)
@@ -885,6 +896,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = []string{}
 		m.showBanner()
 		m.showedBanner = true
+		// Initialize WebSocket notifications now that we have a party ID.
+		// ConnectNotifications is a no-op if already connected.
+		if !m.quote.HasNotifications() {
+			m.quote.ConnectNotifications(m.cfg.TrngleAPIURL, msg.address)
+		}
 		// Start background gas poller once wallet is connected
 		return m, startGasPollerCmd(m.cfg)
 
