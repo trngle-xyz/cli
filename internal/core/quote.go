@@ -83,7 +83,7 @@ func NewMockQuoteClient() *MockQuoteClient {
 }
 
 // NewQuoteClient returns a QuoteClient. If operatorBaseURL is empty or "mock", returns a MockQuoteClient.
-// Otherwise returns an QuoteAPIClient that calls the operator API at operatorBaseURL (e.g. http://localhost:8080).
+// Otherwise returns a QuoteAPIClient that calls the operator API at operatorBaseURL (e.g. http://localhost:8080).
 func NewQuoteClient(operatorBaseURL, apiKey string) QuoteClient {
 	if operatorBaseURL == "" || strings.ToLower(strings.TrimSpace(operatorBaseURL)) == "mock" {
 		return NewMockQuoteClient()

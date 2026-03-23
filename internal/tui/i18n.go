@@ -139,6 +139,14 @@ var languages = map[string]Language{
 			"cleanupFailed":             "Cleanup failed",
 			"noHoldingsFound":           "No holdings found",
 			"quoteCancelled":            "Quote cancelled",
+			"tradeHistoryUnavailable":   "Trade history database not available",
+			"failedTrades":              "Failed Trades",
+			"settledTrades":             "Settled Trades",
+			"inFlightTrades":            "In-Flight Trades",
+			"errorReadingHistory":       "Error reading trade history: ",
+			"tradesUsageHint":           "Use: trades <number> for details",
+			"missingTradePayload":       "missing trade execution payload",
+			"mergingHoldings":           "Merging %d holdings",
 		},
 	},
 	"fr": {
@@ -273,6 +281,14 @@ var languages = map[string]Language{
 			"cleanupFailed":             "Échec du nettoyage",
 			"noHoldingsFound":           "Aucun avoir trouvé",
 			"quoteCancelled":            "Devis annulé",
+			"tradeHistoryUnavailable":   "Base de données d'historique non disponible",
+			"failedTrades":              "Échanges échoués",
+			"settledTrades":             "Échanges réglés",
+			"inFlightTrades":            "Échanges en cours",
+			"errorReadingHistory":       "Erreur de lecture de l'historique: ",
+			"tradesUsageHint":           "Utilisez: trades <numéro> pour les détails",
+			"missingTradePayload":       "données d'exécution manquantes",
+			"mergingHoldings":           "Fusion de %d avoirs",
 		},
 	},
 	"it": {
@@ -407,6 +423,14 @@ var languages = map[string]Language{
 			"cleanupFailed":             "Pulizia fallita",
 			"noHoldingsFound":           "Nessuna disponibilità trovata",
 			"quoteCancelled":            "Preventivo annullato",
+			"tradeHistoryUnavailable":   "Database della cronologia non disponibile",
+			"failedTrades":              "Scambi falliti",
+			"settledTrades":             "Scambi regolati",
+			"inFlightTrades":            "Scambi in corso",
+			"errorReadingHistory":       "Errore lettura cronologia: ",
+			"tradesUsageHint":           "Usa: trades <numero> per i dettagli",
+			"missingTradePayload":       "dati di esecuzione mancanti",
+			"mergingHoldings":           "Fusione di %d disponibilità",
 		},
 	},
 	"es": {
@@ -541,6 +565,14 @@ var languages = map[string]Language{
 			"cleanupFailed":             "Falló la limpieza",
 			"noHoldingsFound":           "No se encontraron tenencias",
 			"quoteCancelled":            "Cotización cancelada",
+			"tradeHistoryUnavailable":   "Base de datos de historial no disponible",
+			"failedTrades":              "Intercambios fallidos",
+			"settledTrades":             "Intercambios liquidados",
+			"inFlightTrades":            "Intercambios en curso",
+			"errorReadingHistory":       "Error al leer historial: ",
+			"tradesUsageHint":           "Usa: trades <número> para detalles",
+			"missingTradePayload":       "datos de ejecución faltantes",
+			"mergingHoldings":           "Fusionando %d tenencias",
 		},
 	},
 	"ru": {
@@ -675,6 +707,14 @@ var languages = map[string]Language{
 			"cleanupFailed":             "Ошибка очистки",
 			"noHoldingsFound":           "Активы не найдены",
 			"quoteCancelled":            "Котировка отменена",
+			"tradeHistoryUnavailable":   "База данных истории сделок недоступна",
+			"failedTrades":              "Неудачные сделки",
+			"settledTrades":             "Завершённые сделки",
+			"inFlightTrades":            "Текущие сделки",
+			"errorReadingHistory":       "Ошибка чтения истории: ",
+			"tradesUsageHint":           "Используйте: trades <номер> для деталей",
+			"missingTradePayload":       "отсутствуют данные для исполнения",
+			"mergingHoldings":           "Объединение %d активов",
 		},
 	},
 	"zh": {
@@ -809,8 +849,66 @@ var languages = map[string]Language{
 			"cleanupFailed":             "清理失败",
 			"noHoldingsFound":           "未找到持仓",
 			"quoteCancelled":            "报价已取消",
+			"tradeHistoryUnavailable":   "交易历史数据库不可用",
+			"failedTrades":              "失败的交易",
+			"settledTrades":             "已结算的交易",
+			"inFlightTrades":            "进行中的交易",
+			"errorReadingHistory":       "读取交易历史出错: ",
+			"tradesUsageHint":           "使用: trades <编号> 查看详情",
+			"missingTradePayload":       "缺少交易执行数据",
+			"mergingHoldings":           "合并 %d 个持仓",
 		},
 	},
+}
+
+// confirmKeys maps language codes to the set of keys that mean "yes".
+// y/Y are always included as universal fallbacks.
+var confirmKeys = map[string][]string{
+	"en": {"y", "Y"},
+	"fr": {"y", "Y", "o", "O"},
+	"it": {"y", "Y", "s", "S"},
+	"es": {"y", "Y", "s", "S"},
+	"ru": {"y", "Y", "д", "Д"},
+	"zh": {"y", "Y"},
+}
+
+// denyKeys maps language codes to the set of keys that mean "no".
+// n/N are always included as universal fallbacks.
+var denyKeys = map[string][]string{
+	"en": {"n", "N"},
+	"fr": {"n", "N"},
+	"it": {"n", "N"},
+	"es": {"n", "N"},
+	"ru": {"n", "N", "н", "Н"},
+	"zh": {"n", "N"},
+}
+
+// IsConfirmKey returns true if the key is a locale-aware confirm key.
+func IsConfirmKey(lang, key string) bool {
+	keys, ok := confirmKeys[lang]
+	if !ok {
+		keys = confirmKeys["en"]
+	}
+	for _, k := range keys {
+		if key == k {
+			return true
+		}
+	}
+	return false
+}
+
+// IsDenyKey returns true if the key is a locale-aware deny key.
+func IsDenyKey(lang, key string) bool {
+	keys, ok := denyKeys[lang]
+	if !ok {
+		keys = denyKeys["en"]
+	}
+	for _, k := range keys {
+		if key == k {
+			return true
+		}
+	}
+	return false
 }
 
 func GetLanguage(code string) Language {

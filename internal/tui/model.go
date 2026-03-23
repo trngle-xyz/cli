@@ -598,7 +598,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.TransitionSpinnerText(m.t("signingSettlementPending"))
 		return m, submitWithHoldingCmd(m.cfg, m.quote.Quote, msg.single)
 	case quoteMergeNeededMsg:
-		m.TransitionSpinnerText(fmt.Sprintf("Merging %d holdings", len(msg.holdings)))
+		m.TransitionSpinnerText(fmt.Sprintf(m.t("mergingHoldings"), len(msg.holdings)))
 		return m, mergeHoldingsCmd(m.cfg, m.quote.Quote, msg.holdings)
 	case quoteMergeCompleteMsg:
 		m.TransitionSpinnerText(m.t("signingSettlementPending"))
@@ -707,8 +707,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		keyStr := msg.String()
 
 		if m.confirmQuit {
-			switch keyStr {
-			case "y", "Y", "enter":
+			if IsConfirmKey(m.lang, keyStr) || keyStr == "enter" {
 				m.confirmQuit = false
 				m.shuttingDown = true
 				if m.gasPoller != nil {
@@ -721,7 +720,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmd = enqueueShutdownLines(lipgloss.NewStyle().Foreground(warning).Render("  ◐ " + m.t("shutdownApiStopping")))
 				}
 				return m, tea.Batch(shutdownAppCmd(m.cfg), cmd)
-			case "n", "N", "esc":
+			}
+			if IsDenyKey(m.lang, keyStr) || keyStr == "esc" {
 				m.confirmQuit = false
 				return m, nil
 			}
@@ -736,10 +736,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.quote.IsAwaitingInput() {
-			switch keyStr {
-			case "y", "Y":
+			if IsConfirmKey(m.lang, keyStr) {
 				if !m.quote.HasExecutablePayload() {
-					m.appendOutput(lipgloss.NewStyle().Foreground(errorC).Render("  missing trade execution payload"))
+					m.appendOutput(lipgloss.NewStyle().Foreground(errorC).Render("  " + m.t("missingTradePayload")))
 					m.appendOutput("")
 					return m, nil
 				}
@@ -762,12 +761,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.appendOutput("")
 				spinnerCmd := m.StartInlineSpinner(m.t("generatingContractPending"))
 				return m, tea.Batch(spinnerCmd, fetchAcceptContextCmd(m.cfg, m.quote.Quote.ID))
-			case "n", "N", "esc":
+			}
+			if IsDenyKey(m.lang, keyStr) || keyStr == "esc" {
 				m.quote.Cancel()
 				m.appendOutput(lipgloss.NewStyle().Foreground(muted).Render("  ✗ " + m.t("tradeCancelled")))
 				m.appendOutput("")
 				return m, nil
-			case "ctrl+c":
+			}
+			if keyStr == "ctrl+c" {
 				m.confirmQuit = true
 				return m, nil
 			}

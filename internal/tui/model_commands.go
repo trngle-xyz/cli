@@ -186,7 +186,7 @@ func (m *Model) renderTradesCommand(parts []string) {
 	if m.historyDB == nil {
 		m.appendOutput(
 			"",
-			lipgloss.NewStyle().Foreground(warning).Render("  Trade history database not available"),
+			lipgloss.NewStyle().Foreground(warning).Render("  "+m.t("tradeHistoryUnavailable")),
 			"",
 		)
 		return
@@ -222,13 +222,13 @@ func (m *Model) renderTradesCommand(parts []string) {
 		switch strings.ToLower(parts[1]) {
 		case "--failed", "-f":
 			statusFilter = "failed"
-			title = "Failed Trades"
+			title = m.t("failedTrades")
 		case "--settled", "-s":
 			statusFilter = "settled"
-			title = "Settled Trades"
+			title = m.t("settledTrades")
 		case "--pending", "-p":
 			statusFilter = "pending"
-			title = "In-Flight Trades"
+			title = m.t("inFlightTrades")
 		}
 	}
 
@@ -237,7 +237,7 @@ func (m *Model) renderTradesCommand(parts []string) {
 	limit := 20
 	txs, total, err := m.historyDB.List(limit, 0, txType, asset)
 	if err != nil {
-		m.appendOutput(lipgloss.NewStyle().Foreground(errorC).Render("  Error reading trade history: "+err.Error()))
+		m.appendOutput(lipgloss.NewStyle().Foreground(errorC).Render("  "+m.t("errorReadingHistory")+err.Error()))
 		return
 	}
 
@@ -309,7 +309,7 @@ func (m *Model) renderTradesCommand(parts []string) {
 	}
 	countInfo += " trades"
 	m.appendOutput(dimStyle.Render(countInfo))
-	m.appendOutput(dimStyle.Render("  Use: trades <number> for details"))
+	m.appendOutput(dimStyle.Render("  "+m.t("tradesUsageHint")))
 	m.appendOutput("")
 }
 

@@ -417,7 +417,6 @@ func (q *QuoteManager) processTradeEvent(
 	failStyle, intermediateSuccessStyle, finalSuccessStyle lipgloss.Style,
 ) ([]string, string, bool, tea.Cmd) {
 	step := steps[q.StatusStep]
-	isFinal := q.StatusStep == len(steps)-1
 
 	switch evt.Type {
 	// Maker confirmed → advance past step 1
@@ -545,7 +544,6 @@ func (q *QuoteManager) processTradeEvent(
 	}
 
 	// Unknown event type or event for a different step — keep spinning.
-	_ = isFinal
 	return nil, "", false, q.tickStatus()
 }
 
