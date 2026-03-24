@@ -83,7 +83,14 @@ func runAPIOnly() error {
 	defer historyDB.Close()
 
 	quoteClient := core.NewQuoteClient(cfg.TrngleAPIURL, cfg.TrngleAPIKey)
-	server := api.NewServer(addr, walletAdapter, quoteClient, historyDB)
+	var serverOpts []api.ServerOption
+	if (cfg.LocalAPI.AuthMode == "auto-token" || cfg.LocalAPI.AuthMode == "fixed-token") && cfg.LocalAPI.FixedToken != "" {
+		serverOpts = append(serverOpts, api.WithAuth(cfg.LocalAPI.FixedToken))
+	}
+	if cfg.TrngleAPIURL != "" && cfg.WalletPartyID != "" {
+		serverOpts = append(serverOpts, api.WithNotifyURL(cfg.TrngleAPIURL, cfg.WalletPartyID))
+	}
+	server := api.NewServer(addr, walletAdapter, quoteClient, historyDB, serverOpts...)
 	fmt.Printf("Starting local API server at http://%s\n", addr)
 
 	// Graceful shutdown on signal.
@@ -174,7 +181,14 @@ func startAPIServerBackground(cfg config.AppConfig) {
 		return
 	}
 
-	apiServer = api.NewServer(addr, walletAdapter, core.NewMockQuoteClient(), historyDB)
+	var serverOpts []api.ServerOption
+	if (cfg.LocalAPI.AuthMode == "auto-token" || cfg.LocalAPI.AuthMode == "fixed-token") && cfg.LocalAPI.FixedToken != "" {
+		serverOpts = append(serverOpts, api.WithAuth(cfg.LocalAPI.FixedToken))
+	}
+	if cfg.TrngleAPIURL != "" && cfg.WalletPartyID != "" {
+		serverOpts = append(serverOpts, api.WithNotifyURL(cfg.TrngleAPIURL, cfg.WalletPartyID))
+	}
+	apiServer = api.NewServer(addr, walletAdapter, core.NewQuoteClient(cfg.TrngleAPIURL, cfg.TrngleAPIKey), historyDB, serverOpts...)
 
 	go func() {
 		if err := apiServer.Start(); err != nil {
