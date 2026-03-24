@@ -1,8 +1,8 @@
+<h1 align="center">TRNGLE <sup>(testnet)</sup></h1>
+
 <p align="center">
   <img src="assets/banner.png" alt="TRNGLE — terminal trading on Canton Network" width="700" />
 </p>
-
-<h1 align="center">TRNGLE <sup>(beta)</sup></h1>
 
 <p align="center">
   <strong>Trade tokens on Canton Network from your terminal.</strong><br/>
