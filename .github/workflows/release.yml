@@ -42,7 +42,7 @@ jobs:
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
           OUTPUT="trngle-${GOOS}-${GOARCH}${EXT}"
           go build -trimpath \
-            -ldflags "-s -w -X github.com/trngle-xyz/cli/internal/tui.Version=${VERSION}" \
+            -ldflags "-X github.com/trngle-xyz/cli/internal/tui.Version=${VERSION}" \
             -o "${OUTPUT}" ./cmd/trngle
 
       - uses: actions/upload-artifact@v4
