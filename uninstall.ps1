@@ -7,12 +7,17 @@ $InstallDir = "$env:LOCALAPPDATA\trngle"
 $ExePath = Join-Path $InstallDir "$Binary.exe"
 $ConfigDir = Join-Path $env:USERPROFILE ".trngle"
 
+Write-Host ""
+Write-Host "  ▲ trngle CLI uninstaller" -ForegroundColor Cyan
+Write-Host "  ────────────────────────"
+Write-Host ""
+
 # Remove binary
 if (Test-Path $ExePath) {
     Remove-Item $ExePath -Force
-    Write-Host "Removed $ExePath"
+    Write-Host "  ✓ Removed $ExePath" -ForegroundColor Green
 } else {
-    Write-Host "trngle binary not found at $ExePath"
+    Write-Host "  · Binary not found at $ExePath"
 }
 
 # Remove install directory if empty
@@ -25,19 +30,21 @@ $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($UserPath -like "*$InstallDir*") {
     $NewPath = ($UserPath -split ";" | Where-Object { $_ -ne $InstallDir }) -join ";"
     [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
-    Write-Host "Removed $InstallDir from PATH"
+    Write-Host "  ✓ Removed $InstallDir from PATH" -ForegroundColor Green
 }
 
 # Optionally remove config
 if (Test-Path $ConfigDir) {
-    $answer = Read-Host "Remove config and history at $ConfigDir? [y/N]"
+    Write-Host ""
+    $answer = Read-Host "  Remove config and history at $ConfigDir? [y/N]"
     if ($answer -match "^[yY]") {
         Remove-Item $ConfigDir -Recurse -Force
-        Write-Host "Removed $ConfigDir"
+        Write-Host "  ✓ Removed $ConfigDir" -ForegroundColor Green
     } else {
-        Write-Host "Kept $ConfigDir"
+        Write-Host "  · Kept $ConfigDir"
     }
 }
 
 Write-Host ""
-Write-Host "trngle uninstalled."
+Write-Host "  ▲ trngle uninstalled." -ForegroundColor Cyan
+Write-Host ""
