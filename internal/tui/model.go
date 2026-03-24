@@ -723,6 +723,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.shuttingDown = true
 				if m.gasPoller != nil {
 					m.gasPoller.StopGasPoller()
+					m.gasPoller.StopAuthRefresh()
 				}
 				m.appendOutput("")
 				m.appendOutput(lipgloss.NewStyle().Foreground(warning).Render("  ◐ " + m.t("shutdownStarting")))

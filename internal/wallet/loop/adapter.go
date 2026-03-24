@@ -58,12 +58,16 @@ type Adapter struct {
 	publicKey  ed25519.PublicKey
 	partyID    string
 	apiURL     string
-	authToken  string
-	apiKey     string
-	ticketID   string
 
-	gasPollerStop chan struct{}
-	gasPollerOnce sync.Once
+	mu        sync.RWMutex // protects authToken, apiKey, ticketID
+	authToken string
+	apiKey    string
+	ticketID  string
+
+	gasPollerStop   chan struct{}
+	gasPollerOnce   sync.Once
+	authRefreshStop chan struct{}
+	authRefreshOnce sync.Once
 }
 
 type ledgerEndResponse struct {
@@ -80,11 +84,23 @@ func NewAdapter() *Adapter {
 	return &Adapter{}
 }
 
-func (a *Adapter) PartyID() string   { return a.partyID }
-func (a *Adapter) AuthToken() string { return a.authToken }
-func (a *Adapter) APIKey() string    { return a.apiKey }
-func (a *Adapter) TicketID() string  { return a.ticketID }
-func (a *Adapter) APIURL() string    { return a.apiURL }
+func (a *Adapter) PartyID() string { return a.partyID }
+func (a *Adapter) AuthToken() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.authToken
+}
+func (a *Adapter) APIKey() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.apiKey
+}
+func (a *Adapter) TicketID() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.ticketID
+}
+func (a *Adapter) APIURL() string { return a.apiURL }
 
 func (a *Adapter) PublicKey() string {
 	if len(a.publicKey) == 0 {
@@ -170,38 +186,128 @@ func (a *Adapter) Authenticate(partyID, apiURL string) error {
 		return fmt.Errorf("parse auth response: %w", err)
 	}
 
+	a.mu.Lock()
 	a.authToken = result.AuthToken
 	a.apiKey = result.APIKey
 	a.ticketID = result.TicketID
+	a.mu.Unlock()
 	return nil
+}
+
+// reauthenticate re-runs Authenticate using the stored partyID and apiURL.
+func (a *Adapter) reauthenticate() error {
+	partyID := a.partyID
+	apiURL := a.apiURL
+	if partyID == "" || apiURL == "" {
+		return fmt.Errorf("cannot re-authenticate: missing partyID or apiURL")
+	}
+	return a.Authenticate(partyID, apiURL)
+}
+
+// doAuthTokenGet performs a GET with Bearer authToken, retrying once on
+// 401/403 after re-authentication.
+func (a *Adapter) doAuthTokenGet(reqURL string) ([]byte, error) {
+	doOnce := func(token string) ([]byte, int, error) {
+		req, err := http.NewRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, 0, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read response: %w", err)
+		}
+		return body, resp.StatusCode, nil
+	}
+
+	a.mu.RLock()
+	token := a.authToken
+	a.mu.RUnlock()
+
+	if token == "" {
+		return nil, fmt.Errorf("not authenticated — call Authenticate first")
+	}
+
+	body, status, err := doOnce(token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Retry once on auth failure.
+	if status == 401 || status == 403 {
+		if reauthErr := a.reauthenticate(); reauthErr != nil {
+			return nil, fmt.Errorf("re-auth after %d: %w", status, reauthErr)
+		}
+		a.mu.RLock()
+		token = a.authToken
+		a.mu.RUnlock()
+
+		body, status, err = doOnce(token)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, fmt.Errorf("http %d: %s", status, string(body))
+	}
+	return body, nil
+}
+
+// StartAuthRefresh launches a background goroutine that re-authenticates
+// every 10 minutes to keep tokens fresh. Safe to call multiple times.
+func (a *Adapter) StartAuthRefresh() {
+	a.authRefreshOnce.Do(func() {
+		a.authRefreshStop = make(chan struct{})
+		go func() {
+			ticker := time.NewTicker(10 * time.Minute)
+			defer ticker.Stop()
+			log.Println("[auth-refresh] started (every 10m)")
+			for {
+				select {
+				case <-a.authRefreshStop:
+					log.Println("[auth-refresh] stopped")
+					return
+				case <-ticker.C:
+					if err := a.reauthenticate(); err != nil {
+						log.Printf("[auth-refresh] failed: %v", err)
+					} else {
+						log.Println("[auth-refresh] tokens refreshed")
+					}
+				}
+			}
+		}()
+	})
+}
+
+// StopAuthRefresh stops the background auth refresh goroutine if running.
+func (a *Adapter) StopAuthRefresh() {
+	ch := a.authRefreshStop
+	if ch == nil {
+		return
+	}
+	select {
+	case <-ch:
+		// already closed
+	default:
+		close(ch)
+	}
 }
 
 // FetchAccount calls GET /api/v1/.connect/pair/account with the bearer
 // token obtained from Authenticate. Returns the account info including
 // the canonical party_id from the Loop participant.
 func (a *Adapter) FetchAccount() (*AccountInfo, error) {
-	if a.authToken == "" {
-		return nil, fmt.Errorf("not authenticated — call Authenticate first")
-	}
-
-	req, err := http.NewRequest("GET", a.apiURL+"/api/v1/.connect/pair/account", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+a.authToken)
-
-	resp, err := http.DefaultClient.Do(req)
+	respBody, err := a.doAuthTokenGet(a.apiURL + "/api/v1/.connect/pair/account")
 	if err != nil {
 		return nil, fmt.Errorf("fetch account: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("fetch account failed (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var account AccountInfo
@@ -235,28 +341,9 @@ type loopHolding struct {
 // GetBalances calls GET /api/v1/.connect/pair/account/holding with the
 // bearer token from Authenticate. Returns fresh balances from the Loop API.
 func (a *Adapter) GetBalances() ([]wallet.Balance, error) {
-	if a.authToken == "" {
-		return nil, fmt.Errorf("not authenticated — call Authenticate first")
-	}
-
-	req, err := http.NewRequest("GET", a.apiURL+"/api/v1/.connect/pair/account/holding", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+a.authToken)
-
-	resp, err := http.DefaultClient.Do(req)
+	respBody, err := a.doAuthTokenGet(a.apiURL + "/api/v1/.connect/pair/account/holding")
 	if err != nil {
 		return nil, fmt.Errorf("fetch holdings: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("fetch holdings failed (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var holdings []loopHolding
@@ -282,9 +369,6 @@ func (a *Adapter) GetBalances() ([]wallet.Balance, error) {
 }
 
 func (a *Adapter) GetHoldingContracts(interfaceID string) ([]wallet.HoldingContract, error) {
-	if a.authToken == "" {
-		return nil, fmt.Errorf("not authenticated — call Authenticate first")
-	}
 	if strings.TrimSpace(a.partyID) == "" {
 		return nil, fmt.Errorf("party id is required")
 	}
@@ -292,27 +376,10 @@ func (a *Adapter) GetHoldingContracts(interfaceID string) ([]wallet.HoldingContr
 		interfaceID = defaultHoldingInterfaceID
 	}
 
-	// Use the Loop SDK endpoint (GET with query param) instead of Canton
-	// JSON-API v2 which is not proxied by the Loop server.
 	reqURL := a.apiURL + "/api/v1/.connect/pair/account/active-contracts?interfaceId=" + url.QueryEscape(interfaceID)
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+a.authToken)
-
-	resp, err := http.DefaultClient.Do(req)
+	respBody, err := a.doAuthTokenGet(reqURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch active contracts: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("fetch active contracts failed (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var entries []map[string]any
@@ -394,28 +461,10 @@ type RawContract struct {
 // GetActiveContractsByTemplate queries the Loop API for active contracts
 // matching a DAML template ID (e.g. "pkg:Splice.Amulet:LockedAmulet").
 func (a *Adapter) GetActiveContractsByTemplate(templateID string) ([]RawContract, error) {
-	if a.authToken == "" {
-		return nil, fmt.Errorf("not authenticated")
-	}
 	reqURL := a.apiURL + "/api/v1/.connect/pair/account/active-contracts?templateId=" + url.QueryEscape(templateID)
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+a.authToken)
-
-	resp, err := http.DefaultClient.Do(req)
+	respBody, err := a.doAuthTokenGet(reqURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch active contracts: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("fetch active contracts (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var entries []map[string]any
@@ -518,28 +567,10 @@ func (a *Adapter) GetLockedAmuletForAllocation(allocationCID string) (*LockedAmu
 // GetRawContractsByInterface queries the Loop API for active contracts
 // matching a DAML interface ID. Returns raw contract data with createArgument.
 func (a *Adapter) GetRawContractsByInterface(interfaceID string) ([]RawContract, error) {
-	if a.authToken == "" {
-		return nil, fmt.Errorf("not authenticated")
-	}
 	reqURL := a.apiURL + "/api/v1/.connect/pair/account/active-contracts?interfaceId=" + url.QueryEscape(interfaceID)
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+a.authToken)
-
-	resp, err := http.DefaultClient.Do(req)
+	respBody, err := a.doAuthTokenGet(reqURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch active contracts: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("fetch active contracts (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var entries []map[string]any
@@ -647,13 +678,17 @@ func (a *Adapter) PrepareAndSubmit(payload wallet.CommandPayload) (*wallet.Trans
 	if len(a.privateKey) == 0 {
 		return nil, fmt.Errorf("wallet not initialized")
 	}
-	if strings.TrimSpace(a.apiKey) == "" || strings.TrimSpace(a.ticketID) == "" {
+	a.mu.RLock()
+	apiKey := a.apiKey
+	ticketID := a.ticketID
+	a.mu.RUnlock()
+	if strings.TrimSpace(apiKey) == "" || strings.TrimSpace(ticketID) == "" {
 		return nil, fmt.Errorf("wallet not authenticated — api key or ticket id missing")
 	}
 
 	buildPrepareReq := func(includeSync bool) map[string]any {
 		req := map[string]any{
-			"ticket_id": a.ticketID,
+			"ticket_id": ticketID,
 			"payload": map[string]any{
 				"commands":                     payload.Commands,
 				"disclosedContracts":           payload.DisclosedContracts,
@@ -747,7 +782,10 @@ func (a *Adapter) PrepareAndSubmit(payload wallet.CommandPayload) (*wallet.Trans
 // them if present. On Loop testnet, gas is charged after each transaction and
 // must be settled before the next transaction can be submitted.
 func (a *Adapter) EnsureGasPaid() error {
-	if strings.TrimSpace(a.apiKey) == "" {
+	a.mu.RLock()
+	apiKey := a.apiKey
+	a.mu.RUnlock()
+	if strings.TrimSpace(apiKey) == "" {
 		return nil // not authenticated yet
 	}
 
@@ -761,7 +799,7 @@ func (a *Adapter) EnsureGasPaid() error {
 	if err != nil {
 		return nil // non-fatal
 	}
-	req.Header.Set("Authorization", "Bearer "+a.apiKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -915,25 +953,50 @@ func (a *Adapter) postAPIKeyJSON(path string, payload any, out any) error {
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
-	req, err := http.NewRequest("POST", a.apiURL+path, bytes.NewReader(body))
+
+	doOnce := func() ([]byte, int, error) {
+		a.mu.RLock()
+		key := a.apiKey
+		a.mu.RUnlock()
+
+		req, err := http.NewRequest("POST", a.apiURL+path, bytes.NewReader(body))
+		if err != nil {
+			return nil, 0, err
+		}
+		req.Header.Set("Authorization", "Bearer "+key)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read response: %w", err)
+		}
+		return respBody, resp.StatusCode, nil
+	}
+
+	respBody, status, err := doOnce()
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+a.apiKey)
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
+	// Retry once on auth failure.
+	if status == 401 || status == 403 {
+		if reauthErr := a.reauthenticate(); reauthErr != nil {
+			return fmt.Errorf("re-auth after %d: %w", status, reauthErr)
+		}
+		respBody, status, err = doOnce()
+		if err != nil {
+			return err
+		}
 	}
-	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("http %d: %s", resp.StatusCode, string(respBody))
+	if status < 200 || status >= 300 {
+		return fmt.Errorf("http %d: %s", status, string(respBody))
 	}
 
 	if out == nil {

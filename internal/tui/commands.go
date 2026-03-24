@@ -85,6 +85,7 @@ func startGasPollerCmd(cfg config.AppConfig) tea.Cmd {
 			return gasPollerReadyMsg{}
 		}
 		adapter.StartGasPoller()
+		adapter.StartAuthRefresh()
 		return gasPollerReadyMsg{poller: adapter}
 	}
 }
