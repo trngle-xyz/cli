@@ -2,9 +2,11 @@
   <img src="assets/banner.png" alt="TRNGLE — terminal trading on Canton Network" width="700" />
 </p>
 
+<h1 align="center">TRNGLE <sup>(beta)</sup></h1>
+
 <p align="center">
   <strong>Trade tokens on Canton Network from your terminal.</strong><br/>
-  Non-custodial. Local-first. Open source.
+  Non-custodial. Local-first.
 </p>
 
 <p align="center">
@@ -69,13 +71,12 @@ Review the rate, press **Y** to confirm, and the swap executes on-chain.
 | `help` | Show available commands |
 | `quit` | Exit |
 
-## Supported Assets
+## Supported Assets (testnet)
 
 | Asset | Description |
 |-------|-------------|
 | CC | Canton Coin (Amulet) |
 | CBTC | Canton BTC |
-| USDXLR | Canton USD stablecoin |
 
 ## How It Works
 
