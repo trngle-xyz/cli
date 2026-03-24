@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -118,7 +117,7 @@ func runTUI() error {
 	// Open local history DB for the TUI (shared with API server via same path).
 	historyDB, err := openHistoryDB()
 	if err != nil {
-		log.Printf("warning: failed to open history DB: %v (trade history will not be recorded)", err)
+		historyDB = nil
 	}
 
 	// Allow the TUI model to start the API server after wizard completes.
@@ -177,7 +176,6 @@ func startAPIServerBackground(cfg config.AppConfig) {
 
 	historyDB, err := openHistoryDB()
 	if err != nil {
-		log.Printf("API server: failed to open history DB: %v", err)
 		return
 	}
 
@@ -191,11 +189,8 @@ func startAPIServerBackground(cfg config.AppConfig) {
 	apiServer = api.NewServer(addr, walletAdapter, core.NewQuoteClient(cfg.TrngleAPIURL, cfg.TrngleAPIKey), historyDB, serverOpts...)
 
 	go func() {
-		if err := apiServer.Start(); err != nil {
-			// http.ErrServerClosed is expected on graceful shutdown.
-			if err.Error() != "http: Server closed" {
-				log.Printf("API server error: %v", err)
-			}
+		if err := apiServer.Start(); err != nil && err.Error() != "http: Server closed" {
+			_ = err // suppress — TUI alt screen cannot display log output
 		}
 		historyDB.Close()
 	}()

@@ -3,7 +3,6 @@ package tui
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 	"time"
@@ -960,7 +959,6 @@ func (m *Model) processTradeEvents() tea.Cmd {
 	// Serialize event for audit log.
 	evtJSON, err := json.Marshal(evt)
 	if err != nil {
-		log.Printf("trade event: marshal failed: %v", err)
 		evtJSON = []byte("{}")
 	}
 	m.historyRecordEvent(evt.Type, string(evtJSON))
@@ -1117,36 +1115,28 @@ func (m *Model) historyInsert(tx history.Tx) {
 	if m.historyDB == nil {
 		return
 	}
-	if err := m.historyDB.Insert(tx); err != nil {
-		log.Printf("history: insert failed: %v", err)
-	}
+	_ = m.historyDB.Insert(tx)
 }
 
 func (m *Model) historyUpdateStatus(newStatus string, opts ...history.UpdateOption) {
 	if m.historyDB == nil || m.activeTxID == "" {
 		return
 	}
-	if err := m.historyDB.UpdateStatus(m.activeTxID, newStatus, opts...); err != nil {
-		log.Printf("history: update status to %s failed: %v", newStatus, err)
-	}
+	_ = m.historyDB.UpdateStatus(m.activeTxID, newStatus, opts...)
 }
 
 func (m *Model) historyUpdateFields(opts ...history.FieldOption) {
 	if m.historyDB == nil || m.activeTxID == "" {
 		return
 	}
-	if err := m.historyDB.UpdateFields(m.activeTxID, opts...); err != nil {
-		log.Printf("history: update fields failed: %v", err)
-	}
+	_ = m.historyDB.UpdateFields(m.activeTxID, opts...)
 }
 
 func (m *Model) historyRecordEvent(eventType string, eventJSON string) {
 	if m.historyDB == nil || m.activeTxID == "" {
 		return
 	}
-	if err := m.historyDB.RecordEvent(m.activeTxID, eventType, eventJSON); err != nil {
-		log.Printf("history: record event %s failed: %v", eventType, err)
-	}
+	_ = m.historyDB.RecordEvent(m.activeTxID, eventType, eventJSON)
 }
 
 func strPtr(s string) *string { return &s }

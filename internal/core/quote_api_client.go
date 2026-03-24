@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -228,10 +227,7 @@ func (c *QuoteAPIClient) RequestQuote(ctx context.Context, from, to, amount, par
 	if err := json.Unmarshal(body, &out); err != nil {
 		return nil, fmt.Errorf("parse quote: %w", err)
 	}
-	expiresAt, err := time.Parse(time.RFC3339, out.ExpiresAt)
-	if err != nil {
-		log.Printf("WARNING: failed to parse quote expires_at %q: %v; using zero time", out.ExpiresAt, err)
-	}
+	expiresAt, _ := time.Parse(time.RFC3339, out.ExpiresAt)
 	return &Quote{
 		ID:         out.QuoteID,
 		FromAsset:  out.FromAsset,
@@ -291,14 +287,8 @@ func (c *QuoteAPIClient) AcceptQuoteContext(ctx context.Context, quoteID string)
 		return nil, err
 	}
 
-	quoteExpiresAt, err := time.Parse(time.RFC3339, out.QuoteExpiresAt)
-	if err != nil {
-		log.Printf("WARNING: failed to parse quote_expires_at %q: %v; using zero time", out.QuoteExpiresAt, err)
-	}
-	confirmBefore, err := time.Parse(time.RFC3339, out.ConfirmBefore)
-	if err != nil {
-		log.Printf("WARNING: failed to parse confirm_before %q: %v; using zero time", out.ConfirmBefore, err)
-	}
+	quoteExpiresAt, _ := time.Parse(time.RFC3339, out.QuoteExpiresAt)
+	confirmBefore, _ := time.Parse(time.RFC3339, out.ConfirmBefore)
 
 	return &AcceptContext{
 		QuoteID:         out.QuoteID,

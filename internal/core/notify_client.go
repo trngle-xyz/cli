@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"log"
 	"net/url"
 	"strings"
 	"sync"
@@ -84,7 +83,6 @@ func (nc *NotifyClient) connectLoop() {
 
 		err := nc.dial()
 		if err != nil {
-			log.Printf("notify: connection failed: %v", err)
 			select {
 			case <-nc.done:
 				return

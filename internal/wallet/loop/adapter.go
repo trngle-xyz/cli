@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -269,18 +268,12 @@ func (a *Adapter) StartAuthRefresh() {
 		go func() {
 			ticker := time.NewTicker(10 * time.Minute)
 			defer ticker.Stop()
-			log.Println("[auth-refresh] started (every 10m)")
 			for {
 				select {
 				case <-a.authRefreshStop:
-					log.Println("[auth-refresh] stopped")
 					return
 				case <-ticker.C:
-					if err := a.reauthenticate(); err != nil {
-						log.Printf("[auth-refresh] failed: %v", err)
-					} else {
-						log.Println("[auth-refresh] tokens refreshed")
-					}
+					_ = a.reauthenticate()
 				}
 			}
 		}()
@@ -859,18 +852,12 @@ func (a *Adapter) StartGasPoller() {
 		go func() {
 			ticker := time.NewTicker(2 * time.Second)
 			defer ticker.Stop()
-			log.Println("[gas-poller] started (every 2s)")
 			for {
 				select {
 				case <-a.gasPollerStop:
-					log.Println("[gas-poller] stopped")
 					return
 				case <-ticker.C:
-					if err := a.EnsureGasPaid(); err != nil {
-						if !strings.Contains(err.Error(), "INACTIVE_CONTRACTS") {
-							log.Printf("[gas-poller] pay failed: %v", err)
-						}
-					}
+					_ = a.EnsureGasPaid()
 				}
 			}
 		}()
