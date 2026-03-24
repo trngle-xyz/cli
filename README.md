@@ -1,4 +1,4 @@
-<h1 align="center">TRNGLE <sup>(testnet)</sup></h1>
+<h1 align="center">TRNGLE <sup>(beta)</sup></h1>
 
 <p align="center">
   <img src="assets/banner.png" alt="TRNGLE — terminal trading on Canton Network" width="700" />
