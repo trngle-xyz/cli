@@ -497,9 +497,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.Focus()
 		return m, nil
 	case settingsBuildMsg:
+		// Persist settings to config file.
+		m.cfg.Network = msg.config.Network
+		if port, err := fmt.Sscanf(msg.config.APIPort, "%d", &m.cfg.LocalAPI.Port); port == 0 || err != nil {
+			m.cfg.LocalAPI.Port = 8080
+		}
+		m.cfg.TrngleAPIURL = config.APIURLForNetwork(m.cfg.Network)
+		if m.configPath != "" {
+			_ = config.Save(m.configPath, m.cfg)
+		}
+		if StartAPIServerFunc != nil {
+			StartAPIServerFunc(m.cfg)
+		}
 		m.appendOutput(lipgloss.NewStyle().Foreground(special).Render("✓ " + m.t("settingsBuildStarted")))
+		m.appendOutput(fmt.Sprintf("  Network: %s", msg.config.Network))
 		m.appendOutput(fmt.Sprintf("  Port: %s", msg.config.APIPort))
-		m.appendOutput(fmt.Sprintf("  Wallet: %s", truncateAddress(msg.config.WalletAddress)))
 		m.settings.Hide()
 		m.input.Focus()
 		return m, nil

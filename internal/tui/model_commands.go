@@ -82,6 +82,12 @@ func (m *Model) executeCommand(cmd string) tea.Cmd {
 			return nil
 		}
 
+		if m.cfg.Network != "testnet" {
+			m.appendOutput(lipgloss.NewStyle().Foreground(errorC).Render(
+				"Trading is only available on testnet. Type `settings` to switch networks."))
+			return nil
+		}
+
 		m.quote.SetTheme(m.theme)
 		m.quote.SetLang(m.lang)
 		m.appendOutput("")
@@ -154,6 +160,13 @@ func (m *Model) executeCommand(cmd string) tea.Cmd {
 		m.settings.SetTheme(m.theme)
 		m.settings.SetLang(m.lang)
 		m.settings.SetSize(m.width, m.height)
+		m.settings.LoadConfig(SettingsConfig{
+			Network:           m.cfg.Network,
+			APIPort:           fmt.Sprintf("%d", m.cfg.LocalAPI.Port),
+			WalletAddress:     m.walletAddr,
+			WalletProviderKey: m.cfg.TrngleAPIKey,
+			TrngleAPIKey:      m.cfg.TrngleAPIKey,
+		})
 		m.settings.Show()
 		m.input.Blur()
 

@@ -11,12 +11,15 @@ import (
 type SettingsField int
 
 const (
-	FieldAPIPort SettingsField = iota
+	FieldNetwork SettingsField = iota
+	FieldAPIPort
 	FieldWalletAddress
 	FieldWalletProviderKey
 	FieldTrngleAPIKey
 	FieldBuildButton
 )
+
+var settingsNetworks = []string{"mainnet", "testnet", "devnet"}
 
 type SettingsPopup struct {
 	visible           bool
@@ -26,12 +29,14 @@ type SettingsPopup struct {
 	lang              string
 	focusedField      SettingsField
 	inputs            []textinput.Model
+	networkIdx        int
 	buildButtonFocus  bool
 	errorMessage      string
 	successMessage    string
 }
 
 type SettingsConfig struct {
+	Network           string
 	APIPort           string
 	WalletAddress     string
 	WalletProviderKey string
@@ -52,14 +57,14 @@ func NewSettingsPopup() SettingsPopup {
 	portInput.CharLimit = 6
 	portInput.Width = 25
 	portInput.Prompt = ""
-	inputs[FieldAPIPort] = portInput
+	inputs[0] = portInput
 
 	walletInput := textinput.New()
 	walletInput.Placeholder = "0x..."
 	walletInput.CharLimit = 256
 	walletInput.Width = 25
 	walletInput.Prompt = ""
-	inputs[FieldWalletAddress] = walletInput
+	inputs[1] = walletInput
 
 	providerKeyInput := textinput.New()
 	providerKeyInput.Placeholder = "api-key"
@@ -68,7 +73,7 @@ func NewSettingsPopup() SettingsPopup {
 	providerKeyInput.Prompt = ""
 	providerKeyInput.EchoMode = textinput.EchoPassword
 	providerKeyInput.EchoCharacter = '•'
-	inputs[FieldWalletProviderKey] = providerKeyInput
+	inputs[2] = providerKeyInput
 
 	trngleKeyInput := textinput.New()
 	trngleKeyInput.Placeholder = "api-key"
@@ -77,14 +82,13 @@ func NewSettingsPopup() SettingsPopup {
 	trngleKeyInput.Prompt = ""
 	trngleKeyInput.EchoMode = textinput.EchoPassword
 	trngleKeyInput.EchoCharacter = '•'
-	inputs[FieldTrngleAPIKey] = trngleKeyInput
-
-	inputs[FieldAPIPort].Focus()
+	inputs[3] = trngleKeyInput
 
 	return SettingsPopup{
 		visible:      false,
 		inputs:       inputs,
-		focusedField: FieldAPIPort,
+		networkIdx:   0,
+		focusedField: FieldNetwork,
 		theme:        "cyan",
 		lang:         "en",
 	}
@@ -107,12 +111,11 @@ func (s *SettingsPopup) Show() {
 	s.visible = true
 	s.errorMessage = ""
 	s.successMessage = ""
-	s.focusedField = FieldAPIPort
+	s.focusedField = FieldNetwork
 	s.buildButtonFocus = false
 	for i := range s.inputs {
 		s.inputs[i].Blur()
 	}
-	s.inputs[FieldAPIPort].Focus()
 }
 
 func (s *SettingsPopup) Hide() {
@@ -139,36 +142,62 @@ func (s *SettingsPopup) getTheme() ColorTheme {
 }
 
 func (s *SettingsPopup) LoadConfig(config SettingsConfig) {
-	s.inputs[FieldAPIPort].SetValue(config.APIPort)
-	s.inputs[FieldWalletAddress].SetValue(config.WalletAddress)
-	s.inputs[FieldWalletProviderKey].SetValue(config.WalletProviderKey)
-	s.inputs[FieldTrngleAPIKey].SetValue(config.TrngleAPIKey)
+	// Set network index.
+	s.networkIdx = 0
+	for i, n := range settingsNetworks {
+		if n == config.Network {
+			s.networkIdx = i
+			break
+		}
+	}
+	s.inputs[0].SetValue(config.APIPort)
+	s.inputs[1].SetValue(config.WalletAddress)
+	s.inputs[2].SetValue(config.WalletProviderKey)
+	s.inputs[3].SetValue(config.TrngleAPIKey)
 }
 
 func (s *SettingsPopup) GetConfig() SettingsConfig {
 	return SettingsConfig{
-		APIPort:           s.inputs[FieldAPIPort].Value(),
-		WalletAddress:     s.inputs[FieldWalletAddress].Value(),
-		WalletProviderKey: s.inputs[FieldWalletProviderKey].Value(),
-		TrngleAPIKey:      s.inputs[FieldTrngleAPIKey].Value(),
+		Network:           settingsNetworks[s.networkIdx],
+		APIPort:           s.inputs[0].Value(),
+		WalletAddress:     s.inputs[1].Value(),
+		WalletProviderKey: s.inputs[2].Value(),
+		TrngleAPIKey:      s.inputs[3].Value(),
 	}
+}
+
+// inputIdx returns the index into s.inputs for a text-input field,
+// or -1 for choice/button fields (FieldNetwork, FieldBuildButton).
+func (s *SettingsPopup) inputIdx() int {
+	switch s.focusedField {
+	case FieldAPIPort:
+		return 0
+	case FieldWalletAddress:
+		return 1
+	case FieldWalletProviderKey:
+		return 2
+	case FieldTrngleAPIKey:
+		return 3
+	}
+	return -1
 }
 
 func (s *SettingsPopup) focusNext() {
 	if s.buildButtonFocus {
 		s.buildButtonFocus = false
-		s.focusedField = FieldAPIPort
-		s.inputs[s.focusedField].Focus()
+		s.focusedField = FieldNetwork
 		return
 	}
-
-	s.inputs[s.focusedField].Blur()
-
+	if idx := s.inputIdx(); idx >= 0 {
+		s.inputs[idx].Blur()
+	}
 	if s.focusedField == FieldTrngleAPIKey {
 		s.buildButtonFocus = true
 	} else {
 		s.focusedField++
-		s.inputs[s.focusedField].Focus()
+		if idx := s.inputIdx(); idx >= 0 {
+			s.inputs[idx].Focus()
+		}
 	}
 }
 
@@ -176,17 +205,19 @@ func (s *SettingsPopup) focusPrev() {
 	if s.buildButtonFocus {
 		s.buildButtonFocus = false
 		s.focusedField = FieldTrngleAPIKey
-		s.inputs[s.focusedField].Focus()
+		s.inputs[3].Focus()
 		return
 	}
-
-	s.inputs[s.focusedField].Blur()
-
-	if s.focusedField == FieldAPIPort {
+	if idx := s.inputIdx(); idx >= 0 {
+		s.inputs[idx].Blur()
+	}
+	if s.focusedField == FieldNetwork {
 		s.buildButtonFocus = true
 	} else {
 		s.focusedField--
-		s.inputs[s.focusedField].Focus()
+		if idx := s.inputIdx(); idx >= 0 {
+			s.inputs[idx].Focus()
+		}
 	}
 }
 
@@ -212,6 +243,18 @@ func (s SettingsPopup) Update(msg tea.Msg) (SettingsPopup, tea.Cmd) {
 			s.focusPrev()
 			return s, nil
 
+		case "left":
+			if s.focusedField == FieldNetwork {
+				s.networkIdx = (s.networkIdx - 1 + len(settingsNetworks)) % len(settingsNetworks)
+				return s, nil
+			}
+
+		case "right":
+			if s.focusedField == FieldNetwork {
+				s.networkIdx = (s.networkIdx + 1) % len(settingsNetworks)
+				return s, nil
+			}
+
 		case "enter":
 			if s.buildButtonFocus {
 				config := s.GetConfig()
@@ -232,9 +275,9 @@ func (s SettingsPopup) Update(msg tea.Msg) (SettingsPopup, tea.Cmd) {
 		}
 	}
 
-	if !s.buildButtonFocus {
+	if idx := s.inputIdx(); idx >= 0 && !s.buildButtonFocus {
 		var cmd tea.Cmd
-		s.inputs[s.focusedField], cmd = s.inputs[s.focusedField].Update(msg)
+		s.inputs[idx], cmd = s.inputs[idx].Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -283,22 +326,35 @@ func (s SettingsPopup) View() string {
 
 	title := titleStyle.Render("⚙  " + s.t("settingsTitle"))
 
+	// Network choice row.
+	networkLabel := labelStyle.Render(s.t("settingsNetwork"))
+	networkVal := settingsNetworks[s.networkIdx]
+	networkFocused := s.focusedField == FieldNetwork && !s.buildButtonFocus
+	var networkRow string
+	if networkFocused {
+		networkRow = networkLabel + focusedInputStyle.Render("◄ "+networkVal+" ►")
+	} else {
+		networkRow = networkLabel + inputStyle.Render("  "+networkVal)
+	}
+
 	fields := []struct {
-		label string
-		field SettingsField
+		label    string
+		field    SettingsField
+		inputIdx int
 	}{
-		{s.t("settingsAPIPort"), FieldAPIPort},
-		{s.t("settingsWalletAddress"), FieldWalletAddress},
-		{s.t("settingsProviderKey"), FieldWalletProviderKey},
-		{s.t("settingsTrngleKey"), FieldTrngleAPIKey},
+		{s.t("settingsAPIPort"), FieldAPIPort, 0},
+		{s.t("settingsWalletAddress"), FieldWalletAddress, 1},
+		{s.t("settingsProviderKey"), FieldWalletProviderKey, 2},
+		{s.t("settingsTrngleKey"), FieldTrngleAPIKey, 3},
 	}
 
 	var rows []string
+	rows = append(rows, networkRow)
 	for _, f := range fields {
 		label := labelStyle.Render(f.label)
 		isFocused := s.focusedField == f.field && !s.buildButtonFocus
 
-		inputView := s.inputs[f.field].View()
+		inputView := s.inputs[f.inputIdx].View()
 		inputLines := strings.Split(inputView, "\n")
 		inputValue := ""
 		if len(inputLines) > 0 {

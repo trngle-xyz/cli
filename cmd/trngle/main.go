@@ -89,6 +89,9 @@ func runAPIOnly() error {
 	if cfg.TrngleAPIURL != "" && cfg.WalletPartyID != "" {
 		serverOpts = append(serverOpts, api.WithNotifyURL(cfg.TrngleAPIURL, cfg.WalletPartyID))
 	}
+	if cfg.Network != "" {
+		serverOpts = append(serverOpts, api.WithNetwork(cfg.Network))
+	}
 	server := api.NewServer(addr, walletAdapter, quoteClient, historyDB, serverOpts...)
 	fmt.Printf("Starting local API server at http://%s\n", addr)
 
@@ -185,6 +188,9 @@ func startAPIServerBackground(cfg config.AppConfig) {
 	}
 	if cfg.TrngleAPIURL != "" && cfg.WalletPartyID != "" {
 		serverOpts = append(serverOpts, api.WithNotifyURL(cfg.TrngleAPIURL, cfg.WalletPartyID))
+	}
+	if cfg.Network != "" {
+		serverOpts = append(serverOpts, api.WithNetwork(cfg.Network))
 	}
 	apiServer = api.NewServer(addr, walletAdapter, core.NewQuoteClient(cfg.TrngleAPIURL, cfg.TrngleAPIKey), historyDB, serverOpts...)
 

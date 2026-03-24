@@ -500,3 +500,39 @@ func TestMethodNotAllowed(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Network gating — trading blocked on non-testnet
+// ---------------------------------------------------------------------------
+
+func TestTradeQuote_MainnetBlocked(t *testing.T) {
+	srv, _ := newTestServer(t, WithNetwork("mainnet"))
+	body := map[string]string{"from": "USD", "to": "BTC", "amount": "100"}
+	rec := doRequest(srv, "POST", "/trade/quote", body, nil)
+	if rec.Code != 403 {
+		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+	var resp map[string]string
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["error"] != "network_not_supported" {
+		t.Errorf("expected error=network_not_supported, got %q", resp["error"])
+	}
+}
+
+func TestTradeQuote_TestnetAllowed(t *testing.T) {
+	srv, _ := newTestServer(t, WithNetwork("testnet"))
+	body := map[string]string{"from": "USD", "to": "BTC", "amount": "100"}
+	rec := doRequest(srv, "POST", "/trade/quote", body, nil)
+	// Should NOT be 403 — it will fail downstream (no real quote client) but that's fine.
+	if rec.Code == 403 {
+		t.Fatalf("testnet trading should not be blocked, got 403")
+	}
+}
+
+func TestTradeConfirm_DevnetBlocked(t *testing.T) {
+	srv, _ := newTestServer(t, WithNetwork("devnet"))
+	rec := doRequest(srv, "POST", "/trade/some-quote-id/confirm", nil, nil)
+	if rec.Code != 403 {
+		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+}

@@ -36,6 +36,13 @@ func WithNotifyURL(operatorURL, partyID string) ServerOption {
 	}
 }
 
+// WithNetwork sets the network name so the server can gate trading.
+func WithNetwork(network string) ServerOption {
+	return func(s *Server) {
+		s.network = network
+	}
+}
+
 type Server struct {
 	version       string
 	startedAt     time.Time
@@ -43,6 +50,7 @@ type Server struct {
 	quotes        core.QuoteClient
 	historyDB     *history.Store
 	authToken     string
+	network       string
 	hub           *Hub
 	notifyURL     string
 	notifyPartyID string
@@ -176,6 +184,12 @@ func (s *Server) handleTradeQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.network != "" && s.network != "testnet" {
+		writeErr(w, http.StatusForbidden, "network_not_supported",
+			"Trading is only available on testnet. Switch to testnet in settings to trade.")
+		return
+	}
+
 	var req struct {
 		From   string `json:"from"`
 		To     string `json:"to"`
@@ -213,6 +227,12 @@ func (s *Server) handleTradeQuote(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 func (s *Server) handleTradeConfirm(w http.ResponseWriter, r *http.Request) {
+	if s.network != "" && s.network != "testnet" {
+		writeErr(w, http.StatusForbidden, "network_not_supported",
+			"Trading is only available on testnet. Switch to testnet in settings to trade.")
+		return
+	}
+
 	// Parse: /trade/{quote_id}/confirm
 	path := strings.TrimPrefix(r.URL.Path, "/trade/")
 	if !strings.HasSuffix(path, "/confirm") {
